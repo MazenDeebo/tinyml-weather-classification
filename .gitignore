@@ -1,0 +1,8 @@
+# Ignore large model files
+models/tensorflow/*.h5
+models/tflite/*.tflite
+
+# Ignore IDE/OS files
+.DS_Store
+.idea/
+__pycache__/

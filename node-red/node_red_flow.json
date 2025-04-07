@@ -1,204 +1,30 @@
 [
     {
-        "id": "a1b2c3d4.123456",
-        "type": "tab",
-        "label": "Weather Dashboard",
-        "disabled": false,
-        "info": ""
-    },
-    {
-        "id": "f1e2d3c4.567890",
-        "type": "mqtt in",
-        "z": "a1b2c3d4.123456",
-        "name": "ESP32 Temperature",
-        "topic": "esp32/temperature",
-        "qos": "0",
-        "datatype": "auto",
-        "broker": "b5a6c7d8.901234",
-        "x": 150,
-        "y": 100,
-        "wires": [
-            ["g5h6i7j8.345678"]
-        ]
-    },
-    {
-        "id": "h1e2d3c4.567891",
-        "type": "mqtt in",
-        "z": "a1b2c3d4.123456",
-        "name": "ESP32 Humidity",
-        "topic": "esp32/humidity",
-        "qos": "0",
-        "datatype": "auto",
-        "broker": "b5a6c7d8.901234",
-        "x": 150,
-        "y": 160,
-        "wires": [
-            ["g5h6i7j8.345678"]
-        ]
-    },
-    {
-        "id": "g5h6i7j8.345678",
+        "id": "8474e62a35d9fe8b",
         "type": "function",
-        "z": "a1b2c3d4.123456",
+        "z": "9c76d92f709fa434",
         "name": "Combine Sensor Data",
-        "func": "// Initialize context if not exists\nif (!context.sensorData) {\n    context.sensorData = {\n        temp: [],\n        hum: [],\n        time: [],\n        lastTemp: null,\n        lastHum: null\n    };\n}\n\n// Update the appropriate value based on topic\nif (msg.topic === \"esp32/temperature\") {\n    context.sensorData.lastTemp = parseFloat(msg.payload);\n} else if (msg.topic === \"esp32/humidity\") {\n    context.sensorData.lastHum = parseFloat(msg.payload);\n}\n\n// Only proceed if we have both values\nif (context.sensorData.lastTemp !== null && context.sensorData.lastHum !== null) {\n    // Add new data (limit to 50 points)\n    context.sensorData.temp.push(context.sensorData.lastTemp);\n    context.sensorData.hum.push(context.sensorData.lastHum);\n    context.sensorData.time.push(new Date().toLocaleTimeString());\n    \n    if (context.sensorData.temp.length > 50) {\n        context.sensorData.temp.shift();\n        context.sensorData.hum.shift();\n        context.sensorData.time.shift();\n    }\n    \n    // Prepare output for charts\n    var newMsg = {\n        payload: {\n            temperature: context.sensorData.lastTemp,\n            humidity: context.sensorData.lastHum,\n            chartData: {\n                labels: context.sensorData.time,\n                datasets: [\n                    {\n                        label: \"Temperature (°C)\",\n                        data: context.sensorData.temp,\n                        borderColor: \"#FF6384\",\n                        backgroundColor: \"rgba(255, 99, 132, 0.2)\",\n                        yAxisID: 'y'\n                    },\n                    {\n                        label: \"Humidity (%)\",\n                        data: context.sensorData.hum,\n                        borderColor: \"#36A2EB\",\n                        backgroundColor: \"rgba(54, 162, 235, 0.2)\",\n                        yAxisID: 'y1'\n                    }\n                ]\n            }\n        }\n    };\n    \n    return [newMsg, {payload: context.sensorData.lastTemp}, {payload: context.sensorData.lastHum}];\n}\n\nreturn null;",
-        "outputs": "3",
+        "func": "// Initialize context if not exists\nif (!context.sensorData) {\n    context.sensorData = {\n        temp: [],\n        hum: [],\n        time: [],\n        lastTemp: null,\n        lastHum: null,\n        lastPrediction: null\n    };\n}\n\n// Update the appropriate value based on topic\nif (msg.topic === \"esp32/temperature\") {\n    context.sensorData.lastTemp = parseFloat(msg.payload);\n} else if (msg.topic === \"esp32/humidity\") {\n    context.sensorData.lastHum = parseFloat(msg.payload);\n} else if (msg.topic === \"esp32/prediction\") {\n    try {\n        // Force conversion to string for any object type\n        if (typeof msg.payload === \"object\" && msg.payload !== null) {\n            // Check if prediction property exists\n            if (msg.payload.hasOwnProperty('prediction')) {\n                // Extract only the prediction value\n                context.sensorData.lastPrediction = msg.payload.prediction.toString();\n            } else {\n                // If no prediction property, convert whole object to readable string\n                context.sensorData.lastPrediction = JSON.stringify(msg.payload, null, 2);\n            }\n        } \n        // Handle string payloads that might be JSON\n        else if (typeof msg.payload === \"string\") {\n            try {\n                // Try to parse as JSON\n                const parsedPayload = JSON.parse(msg.payload);\n                if (parsedPayload.hasOwnProperty('prediction')) {\n                    context.sensorData.lastPrediction = parsedPayload.prediction.toString();\n                } else {\n                    context.sensorData.lastPrediction = JSON.stringify(parsedPayload, null, 2);\n                }\n            } catch (e) {\n                // If not valid JSON, use as is\n                context.sensorData.lastPrediction = msg.payload;\n            }\n        }\n        // Handle all other types\n        else {\n            context.sensorData.lastPrediction = msg.payload !== null ? msg.payload.toString() : \"No prediction\";\n        }\n    } catch (e) {\n        // Fallback for any error\n        context.sensorData.lastPrediction = \"Error: \" + e.message;\n    }\n}\n\n// Only proceed if we have temp, hum, and prediction\nif (\n    context.sensorData.lastTemp !== null &&\n    context.sensorData.lastHum !== null &&\n    context.sensorData.lastPrediction !== null\n) {\n    // Add new data (limit to 50 points)\n    context.sensorData.temp.push(context.sensorData.lastTemp);\n    context.sensorData.hum.push(context.sensorData.lastHum);\n    context.sensorData.time.push(new Date().toLocaleTimeString());\n\n    if (context.sensorData.temp.length > 50) {\n        context.sensorData.temp.shift();\n        context.sensorData.hum.shift();\n        context.sensorData.time.shift();\n    }\n\n    // Prepare output for charts\n    var newMsg = {\n        payload: {\n            temperature: context.sensorData.lastTemp,\n            humidity: context.sensorData.lastHum,\n            prediction: context.sensorData.lastPrediction,\n            chartData: {\n                labels: context.sensorData.time,\n                datasets: [\n                    {\n                        label: \"Temperature (°C)\",\n                        data: context.sensorData.temp,\n                        borderColor: \"#FF6384\",\n                        backgroundColor: \"rgba(255, 99, 132, 0.2)\",\n                        yAxisID: 'y'\n                    },\n                    {\n                        label: \"Humidity (%)\",\n                        data: context.sensorData.hum,\n                        borderColor: \"#36A2EB\",\n                        backgroundColor: \"rgba(54, 162, 235, 0.2)\",\n                        yAxisID: 'y1'\n                    }\n                ]\n            }\n        }\n    };\n\n    return [{ payload: context.sensorData.lastPrediction }, { payload: context.sensorData.lastTemp },{ payload: context.sensorData.lastHum },newMsg];\n}\n\nreturn null;\n",
+        "outputs": 3,
+        "timeout": "",
         "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
         "x": 350,
         "y": 130,
         "wires": [
-            ["o3p4q5r6.567890"],
-            ["m5n6o7p8.901234"],
-            ["q9r0s1t2.345678"]
+            [
+                "9ad9b2f41b1d4ad2"
+            ],
+            [
+                "d01d74cd39521eef",
+                "e00df2adabcbde13"
+            ],
+            [
+                "ce7eaad5d82ec434",
+                "a8d37c87910cface"
+            ]
         ]
-    },
-    {
-        "id": "o3p4q5r6.567890",
-        "type": "ui_chart",
-        "z": "a1b2c3d4.123456",
-        "name": "Weather Charts",
-        "group": "g1h2i3j4.789012",
-        "order": 1,
-        "width": "12",
-        "height": "6",
-        "label": "Temperature & Humidity",
-        "chartType": "line",
-        "legend": "true",
-        "xformat": "HH:mm:ss",
-        "interpolate": "linear",
-        "nodata": "Waiting for data...",
-        "dot": false,
-        "ymin": "",
-        "ymax": "",
-        "removeOlder": "50",
-        "removeOlderPoints": "",
-        "removeOlderUnit": "60",
-        "cutout": 0,
-        "x": 550,
-        "y": 100,
-        "wires": []
-    },
-    {
-        "id": "m5n6o7p8.901234",
-        "type": "ui_gauge",
-        "z": "a1b2c3d4.123456",
-        "name": "Temperature Gauge",
-        "group": "g1h2i3j4.789012",
-        "order": 2,
-        "width": "4",
-        "height": "4",
-        "gtype": "gage",
-        "title": "Temperature",
-        "label": "°C",
-        "format": "{{value}}",
-        "min": 0,
-        "max": "50",
-        "colors": [
-            "#00BFFF",
-            "#1E90FF",
-            "#4169E1"
-        ],
-        "seg1": "15",
-        "seg2": "30",
-        "x": 550,
-        "y": 200,
-        "wires": []
-    },
-    {
-        "id": "q9r0s1t2.345678",
-        "type": "ui_gauge",
-        "z": "a1b2c3d4.123456",
-        "name": "Humidity Gauge",
-        "group": "g1h2i3j4.789012",
-        "order": 3,
-        "width": "4",
-        "height": "4",
-        "gtype": "gage",
-        "title": "Humidity",
-        "label": "%",
-        "format": "{{value}}",
-        "min": 0,
-        "max": "100",
-        "colors": [
-            "#00BFFF",
-            "#1E90FF",
-            "#4169E1"
-        ],
-        "seg1": "30",
-        "seg2": "70",
-        "x": 550,
-        "y": 280,
-        "wires": []
-    },
-    {
-        "id": "s7t8u9v0.678901",
-        "type": "ui_text",
-        "z": "a1b2c3d4.123456",
-        "group": "g1h2i3j4.789012",
-        "order": 4,
-        "width": "4",
-        "height": "2",
-        "name": "Temperature Display",
-        "label": "Current Temperature",
-        "format": "<div style=\"text-align:center;font-size:24px;\">{{value}} °C</div>",
-        "layout": "row-spread",
-        "x": 550,
-        "y": 360,
-        "wires": []
-    },
-    {
-        "id": "w1x2y3z4.789012",
-        "type": "ui_text",
-        "z": "a1b2c3d4.123456",
-        "group": "g1h2i3j4.789012",
-        "order": 5,
-        "width": "4",
-        "height": "2",
-        "name": "Humidity Display",
-        "label": "Current Humidity",
-        "format": "<div style=\"text-align:center;font-size:24px;\">{{value}} %</div>",
-        "layout": "row-spread",
-        "x": 550,
-        "y": 420,
-        "wires": []
-    },
-    {
-        "id": "b5a6c7d8.901234",
-        "type": "mqtt-broker",
-        "name": "HiveMQ Cloud",
-        "broker": "2e422052cd1643ee9205278aaa41846b.s1.eu.hivemq.cloud",
-        "port": "8883",
-        "clientid": "",
-        "autoConnect": true,
-        "usetls": true,
-        "compatmode": false,
-        "keepalive": "60",
-        "cleansession": true,
-        "birthTopic": "",
-        "birthQos": "0",
-        "birthPayload": "",
-        "closeTopic": "",
-        "closeQos": "0",
-        "closePayload": "",
-        "willTopic": "",
-        "willQos": "0",
-        "willPayload": ""
-    },
-    {
-        "id": "g1h2i3j4.789012",
-        "type": "ui_group",
-        "name": "Weather Dashboard",
-        "tab": "t1u2v3w4.123456",
-        "order": 1,
-        "disp": true,
-        "width": "12",
-        "collapse": false
-    },
-    {
-        "id": "t1u2v3w4.123456",
-        "type": "ui_tab",
-        "name": "Weather Station",
-        "icon": "dashboard",
-        "order": 1
     }
 ]
